@@ -11,8 +11,9 @@ class Link_State_Node(Node):
         self.id = id #
         self.edges = [] #lof all edges
         self.weights = {} #weights keyed by edges
+        self.seq = {}
+        self.lastMsgs ={}
         self.nodes = [] #lof nodes to help with dijsktras
-        self.seq = 0  
 
     # Return a string
     #can be mostly ignored, used for debugging
@@ -27,11 +28,12 @@ class Link_State_Node(Node):
     # Fill in this function
     # if a new link is added, update your graph, then create a message to update your neighbors
     def link_has_been_updated(self, neighbor, latency):
-        #create an edge
         edge = frozenset({self.id, neighbor})
-        if latency == -1 and edge in self.edges: #remove if you have to
+        if latency == -1 and edge in self.edges: #remove the edge if you have to
             self.edges.remove(edge)
             del self.weights[edge]
+            del self.seq[edge]
+            del self.lastMsgs[edge]
             for node in edge:
                 self.nodes.remove(node)
             return
@@ -40,30 +42,47 @@ class Link_State_Node(Node):
             for node in edge:
                 self.nodes.append(node)
         self.weights[edge] = latency #update the cost if necessary
-        message = {"src": self.id, "dest": neighbor, "cost": latency, "seq": self.seq} #send message
-        self.send_to_neighbors(json.dumps(message))
-        self.seq+=1 #increment number
+        if edge in self.seq: self.seq[edge] +=1 #update the sequence number or initialize it
+        else: self.seq[edge] = 0
+
+
+        #retransmit all your most recent messages from each node - do this because a new node doesn't have information about the graphh so it needs it
+        #also send along this new message 
+        message = json.dumps({"src": self.id, "dest": neighbor, "cost": latency, "seq": self.seq[edge]}) #send message
+        self.lastMsgs[edge] = message
+        for key, value in self.lastMsgs.items():
+            self.send_to_neighbors(value)
         # latency = -1 if delete a link
 
 
-    # Fill in this function
-    #when you receive a message, only if its new: add to your graph, then send to all neighbors except the one you just got it for
-    def process_incoming_routing_message(self, m):
-        m = json.loads(m)
-        if m["seq"] >= self.seq: #if the sequence number received is not less than your sequence number, indicating newness
-            #store it in the graph
-            edge = frozenset({m["src"], m["dest"] })
-            self.edges.append(edge)
-            self.nodes.append(m["src"])
-            self.nodes.append(m["dest"])
-            self.weights[edge] = m["cost"]
-            #send to all neighbors except who you recceived it 
-            for edge in self.edges: #all edges
-                if self.id in edge: #only your specific edges
-                    for v in edge: #
-                        if v != self.id and v != m["src"]: #find the node that isn't you, and isn't the node you received this message from
-                            self.send_to_neighbor(v, json.dumps(m)) #retransmit the message
 
+    # Fill in this function
+    #if you get an old message, get your neighbors up to date
+    #else either add this new connection, or update, and retransmit to your neighbors
+    def process_incoming_routing_message(self, m):
+       
+
+
+        m = json.loads(m)
+        edge = frozenset({m["src"], m["dest"] })
+        #if old message, update your neighbors with your latest information concerning this edge
+        if edge in self.edges and m["seq"] < self.seq[edge]:
+            self.send_to_neighbors(self.lastMsgs[edge])
+        else: 
+            if edge not in self.edges: #if youu don't have this edge add it
+                self.edges.append(edge)
+                self.nodes.append(m["src"])
+                self.nodes.append(m["dest"])
+            #update accordingly
+            self.weights[edge] = m["cost"]
+            self.seq[edge] = m["seq"]
+            self.lastMsgs[edge] = json.dumps(m)
+            for key, value in self.lastMsgs.items(): #retransmit this message (along with your most reccent messages incase you hade to inform a newly added nodee)
+                self.send_to_neighbors(value)
+
+
+     
+        ##logic here is off
 
 
     # Return a neighbor, -1 if no path to destination
