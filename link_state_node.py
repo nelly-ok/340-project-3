@@ -16,7 +16,6 @@ class Link_State_Node(Node):
         self.nodes = [id] #lof nodes to help with dijsktras
 
     # Return a string
-    #can be mostly ignored, used for debugging
     def __str__(self):
         #return "Rewrite this function to define your node dump printout"
         res = ''
@@ -41,20 +40,17 @@ class Link_State_Node(Node):
             if edge not in self.edges: #else if its not already in the graph, add it
                 self.edges.append(edge)
                 self.nodes.append(neighbor)
-                for key, value in self.lastMsgs.items():
+                for key, value in self.lastMsgs.items(): #since its a new node, update it with all your recent messaages
                     self.send_to_neighbor(neighbor, value)
             
-            self.weights[edge] = latency #update the cost if necessary
-            # if edge in self.seq: self.seq[edge] +=1 #update the sequence number or initialize it
-            # else: self.seq[edge] = 0
+            self.weights[edge] = latency #update the cost
+
         #retransmit all your most recent messages from each node - do this because a new node doesn't have information about the graphh so it needs it
         #also send along this new message 
         message = json.dumps({"src": self.id, "dest": neighbor, "cost": latency, "seq": time}) #send message
         self.send_to_neighbors(message)
         self.lastMsgs[edge] = message
-        # for key, value sin self.lastMsgs.items():
-        #     self.send_to_neighbors(value)
-        # latency = -1 if delete a link
+        
 
 
 
@@ -64,9 +60,7 @@ class Link_State_Node(Node):
     def process_incoming_routing_message(self, m):
         m = json.loads(m)
         edge = frozenset({m["src"], m["dest"] })
-        #if old message, update your neighbors with your latest information concerning this edge
-        
-        if edge not in self.seq or m["seq"] > self.seq[edge]:
+        if edge not in self.seq or m["seq"] > self.seq[edge]: #if old message, update your neighbors with your latest information concerning this edge
             self.seq[edge] = m["seq"]
             if m["cost"] == -1 and edge in self.edges: #remove the edge if you have to
                 self.edges.remove(edge)
@@ -89,9 +83,8 @@ class Link_State_Node(Node):
                 #update accordingly
                 self.weights[edge] = m["cost"]
                 self.lastMsgs[edge] = json.dumps(m)
-            #eeverrything not source
             self.send_to_neighbors(json.dumps(m)) #retransmit the message
-        else: 
+        else: #if old message, update your neighbors with your latest information concerning this edge 
             if m["seq"] < self.seq[edge]:
                 self.send_to_neighbor(m["src"], self.lastMsgs[edge])
 
@@ -106,17 +99,24 @@ class Link_State_Node(Node):
         #dijkstras
         dist = {}
         prev = {}
-        for edge in self.edges:
-            for v in edge:
+        Q = self.nodes.copy()
+        for v in Q:
                 dist[v] = sys.maxsize
                 prev[v] = None
-        dist[id] = 0
-        Q = self.nodes.copy()
+        dist[destination] = 0
         
         while len(Q) > 0:
             u = self.get_min_vertex(Q, dist) #gets the vertex u in the Q with min dist[u]
             Q.remove(u)
 
+
+            # for v in self.get_all_neighbors(u):
+            #     alt = dist[u] + self.weights[frozenset({u,v})]
+            #     if alt < dist[v]:
+            #         dist[v] = alt
+            #         prev[v] = u
+
+                
             for edge in self.edges: #for each edge
                 if u in edge: #allows you to access only neighbors of u
                     alt = dist[u] + self.weights[edge]
@@ -126,14 +126,7 @@ class Link_State_Node(Node):
                                 dist[v] = alt
                                 prev[v] = u
         
-        try:
-            #back track from destination till you get to the hop that comes right after the source
-            res = destination
-            while res != None and prev[res] and prev[res] != id:
-                res = prev[res]
-            return res
-        except:
-            return -1
+        return prev.get(self.id)
         
 
 
@@ -146,3 +139,10 @@ class Link_State_Node(Node):
                 minNode = node      
         return minNode
     
+    def get_all_neighbors(self, u):
+        res = []
+        for edge in self.edges:
+            if u in edge:
+                for node in edge:
+                    if node !=u: res.append(node)
+        return res
