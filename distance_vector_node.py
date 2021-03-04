@@ -1,12 +1,16 @@
 from simulator.node import Node
+
 import json
+
+
+#get_time
 
 
 class Distance_Vector_Node(Node):
     def __init__(self, id):
         super().__init__(id)
         #self.my_dv = {} #lists thee [cost, next_hop] for every destination
-        self.my_dv = {id: {"cost": 0, "path": []}}
+        self.my_dv = {}
         self.neighbors_dvs = {}
         self.neighbors_prev_seq = {}
         self.neighbors_cost = {} ####please change
@@ -115,10 +119,10 @@ class Distance_Vector_Node(Node):
                 for subNeigh in self.neighbors_dvs[neighbor]:
                     if self.id not in self.neighbors_dvs[neighbor][subNeigh]["path"]:
                         if subNeigh not in dv:
-                            dv[subNeigh] = self.neighbors_dvs[neighbor][subNeigh]["cost"] + dv[neighbor]["cost"], dv[neighbor]["path"] + self.neighbors_dvs[neighbor][subNeigh]["path"] #fuck with append
+                            dv[subNeigh] = {"cost": self.neighbors_dvs[neighbor][subNeigh]["cost"] + dv[neighbor]["cost"], "path": dv[neighbor]["path"] + self.neighbors_dvs[neighbor][subNeigh]["path"]} #fuck with append
                         else: 
                             if (dv[neighbor]["cost"] + self.neighbors_dvs[neighbor][subNeigh]["cost"]) < dv[subNeigh]["cost"]:
-                                dv[subNeigh] = self.neighbors_dvs[neighbor][subNeigh]["cost"] + dv[neighbor]["cost"], dv[neighbor]["path"] + self.neighbors_dvs[neighbor][subNeigh]["path"] #fuck with append
+                                dv[subNeigh] = {"cost": self.neighbors_dvs[neighbor][subNeigh]["cost"] + dv[neighbor]["cost"], "path": dv[neighbor]["path"] + self.neighbors_dvs[neighbor][subNeigh]["path"]} #fuck with append
         return dv
 
         '''
